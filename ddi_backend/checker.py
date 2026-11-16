@@ -8,7 +8,9 @@ from itertools import combinations
 
 from ddi_backend import ingest, rules
 from ddi_backend.common import DISCLAIMER, NOT_AVAILABLE, NOT_SAFE_NOTE, severity_rank
+from ddi_backend.eligibility import EligibilityFilter
 from ddi_backend.graph import Graph
+from ddi_backend.registry import ROLE_DIRECT, load_registry
 from ddi_backend.resolver import AMBIGUOUS_NAME, RESOLVED, UNKNOWN_DRUG, Resolver
 
 DOCUMENTED = "documented_interaction"
@@ -30,12 +32,19 @@ def as_medication(item):
 
 
 class Checker:
-    def __init__(self, conn, aliases=None, suggester=None, evidence_filter=None):
+    def __init__(self, conn, aliases=None, suggester=None, registry=None, eligibility=True,
+                 extra_evidence=None):
+        """``eligibility`` True builds the filter from the source registry (the seed file unless
+        ``registry`` is given); None or False turns it off. ``extra_evidence(names) -> [records]``
+        adds records from other sources for a pair; the database never supplies them."""
         self.conn = conn
         self.graph = Graph.from_connection(conn)
         self.resolver = Resolver.from_connection(conn, aliases=aliases, suggester=suggester)
         self._known = frozenset(ingest.drug_names(conn))
-        self.evidence_filter = evidence_filter  # set in phase 3; None means every row is evidence
+        if eligibility is True:
+            eligibility = EligibilityFilter(registry if registry is not None else load_registry())
+        self.eligibility = eligibility or None
+        self.extra_evidence = extra_evidence
 
     # ------------------------------------------------------------------
     # Medications
@@ -74,6 +83,8 @@ class Checker:
 
         fired.append(rules.RULE_PAIR_LOOKUP)
         rows = ingest.pair_records(self.conn, ra.drug_id, rb.drug_id, self._known)
+        if self.extra_evidence is not None:
+            rows = rows + list(self.extra_evidence(pair_names))
         result = {"pair": pair_names, "doses": {pair_names[0]: first.get("dose"), pair_names[1]: second.get("dose")}}
         if not rows:
             fired.append(rules.RULE_ABSENCE_NOT_SAFETY)
@@ -85,9 +96,49 @@ class Checker:
         if dropped:
             fired.append(rules.RULE_DUPLICATE_COLLAPSED)
             result["duplicate_record_ids"] = dropped
-        if self.evidence_filter is not None:
-            return self.evidence_filter.apply(self, result, rows, fired, ra, rb, current_ids)
-        return self.documented_result(result, rows, fired, ra, rb, current_ids)
+        if self.eligibility is None:
+            return self.documented_result(result, rows, fired, ra, rb, current_ids)
+
+        fired.append(rules.RULE_ELIGIBILITY)
+        eligible, excluded = self.eligibility.partition(rows, pair_names)
+        result["evidence"] = [e.to_dict() for e in eligible + excluded]
+        direct = [e.record for e in eligible if e.role == ROLE_DIRECT]
+        context = [e.record for e in eligible if e.role != ROLE_DIRECT]
+        excluded_reasons = [f"excluded_record {e.record['id']}: {e.reason}" for e in excluded]
+        if direct:
+            result = self.documented_result(result, direct, fired, ra, rb, current_ids)
+            if context:
+                result["context_evidence"] = context
+            if excluded_reasons:  # the rest of the evidence is dropped and sent to a human
+                result["excluded_evidence"] = [e.to_dict() for e in excluded]
+                result["needs_review"] = True
+                result["review_reasons"] = result["review_reasons"] + excluded_reasons
+            return result
+
+        # No eligible direct evidence. If something was excluded that must never read as "no interaction".
+        if excluded:
+            fired.append(rules.RULE_EVIDENCE_INELIGIBLE)
+            result.update(
+                status=EVIDENCE_INELIGIBLE,
+                severity=None,
+                records=[],
+                alternatives=[],
+                excluded_evidence=[e.to_dict() for e in excluded],
+                message=("Our data has evidence for this pair, but none of it is eligible: "
+                         + "; ".join(e.reason for e in excluded)
+                         + ". This is not a statement that there is no interaction."),
+                notes=[NOT_SAFE_NOTE],
+                rules_fired=fired,
+                needs_review=True,
+                review_reasons=excluded_reasons,
+            )
+            if context:
+                result["context_evidence"] = context
+            return result
+        fired.append(rules.RULE_ABSENCE_NOT_SAFETY)
+        result.update(status=NO_DOCUMENTED, severity=None, records=[], alternatives=[],
+                      context_evidence=context, notes=[NOT_SAFE_NOTE], rules_fired=fired, needs_review=False)
+        return result
 
     def documented_result(self, result, rows, fired, ra, rb, current_ids, notes=()):
         """Build a documented_interaction result from the eligible rows of a pair."""
