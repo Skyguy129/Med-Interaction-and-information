@@ -103,6 +103,21 @@ def filter_by_population(records, population):
     return [r for r in records if (r.get("population") or "").casefold() == wanted], None
 
 
+def context_question(question, patient_context=None):
+    """A clarifying question when the question depends on patient context we were not given.
+
+    We never assume the context. ``patient_context`` maps a context name (for example "children") to
+    what the user told us; a missing entry produces the question.
+    """
+    given = patient_context or {}
+    for pattern, context in _CONTEXTS:
+        if pattern.search(question) and not given.get(context):
+            return (f"Your question mentions {context}. Can you tell me more about that (for example the age "
+                    f"or condition)? Our data does not cover {context}, so please also ask a pharmacist or "
+                    "clinician.")
+    return None
+
+
 def _norm(text):
     return re.sub(r"[^a-z0-9]+", " ", text.casefold()).strip()
 
@@ -221,6 +236,9 @@ class QuestionAnswerer:
                 notes.append(f"Your question mentions {context}. " + note)
                 if RULE_POPULATION not in fired:
                     fired.append(RULE_POPULATION)
+        clarifying = context_question(question)
+        if clarifying:
+            answer["clarifying_question"] = clarifying
         if _DOSE.search(question):
             notes.append("Doses are echoed back but this system never recommends or calculates a dose; "
                          "ask a pharmacist or clinician.")
