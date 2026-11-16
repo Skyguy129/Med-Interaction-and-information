@@ -53,3 +53,23 @@ def real_db_path():
 
 def open_real():
     return ingest.open_readonly(real_db_path(), ingest.CORE_TABLES)
+
+
+def real_full_db_path():
+    """A database built once per test run from the real DDI and HPO files."""
+    if "full" not in _real:
+        tmp = tempfile.mkdtemp()
+        atexit.register(shutil.rmtree, tmp, ignore_errors=True)
+        db_path = Path(tmp) / "full.db"
+        conn = load_data.connect(db_path)
+        try:
+            load_data.load_ddi(conn, load_data.DEFAULT_DDI)
+            load_data.load_hpo(conn, load_data.DEFAULT_HPO)
+        finally:
+            conn.close()
+        _real["full"] = db_path
+    return _real["full"]
+
+
+def open_real_full():
+    return ingest.open_readonly(real_full_db_path())

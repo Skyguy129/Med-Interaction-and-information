@@ -87,6 +87,13 @@ class Resolver:
         rows = conn.execute("SELECT drug_id, name FROM drugs").fetchall()
         return cls(rows, aliases=aliases, suggester=suggester)
 
+    def lookup_terms(self):
+        """{normalised text: drug name or alias} for finding drug mentions inside a sentence."""
+        terms = {re.sub(r"[^a-z0-9]+", " ", key).strip(): name for key, (_, name) in self._by_key.items()}
+        for alias in self._aliases:
+            terms[re.sub(r"[^a-z0-9]+", " ", alias).strip()] = alias
+        return terms
+
     def resolve(self, text):
         name, dose = normalize_name(text)
         if not name:

@@ -1,4 +1,12 @@
-"""Search only the DDI and HPO records loaded by load_data.py."""
+"""Search only the DDI and HPO records loaded by load_data.py.
+
+``search_records`` finds interaction records for a question with the same rules as
+the question answerer: exact drug names first, negation and avoid lists, symptom
+words through HPO, most severe first. It no longer mixes HPO terms into the
+results; HPO is a vocabulary, so phenotype records come from ``search_hpo_records``.
+The old word-by-word LIKE search let generic words ("not", "take", "which", "pain")
+use up the result slots before the drug name contributed, so it was replaced.
+"""
 
 import re
 import sys
@@ -7,50 +15,6 @@ from ddi_backend import ingest
 
 REQUIRED_TABLES = ingest.REQUIRED_TABLES
 QUERY_WORDS = re.compile(r"[a-z0-9]+", re.IGNORECASE)
-IGNORED_TERMS = {
-    "about",
-    "and",
-    "are",
-    "can",
-    "condition",
-    "conditions",
-    "database",
-    "describe",
-    "does",
-    "drug",
-    "drugs",
-    "effect",
-    "effects",
-    "explain",
-    "find",
-    "for",
-    "give",
-    "hpo",
-    "involve",
-    "involves",
-    "involving",
-    "information",
-    "interaction",
-    "interactions",
-    "is",
-    "medical",
-    "me",
-    "of",
-    "please",
-    "related",
-    "show",
-    "side",
-    "symptom",
-    "symptoms",
-    "tell",
-    "the",
-    "these",
-    "this",
-    "what",
-    "phenotype",
-    "phenotypes",
-    "with",
-}
 
 
 def open_database(db_path=None):
@@ -70,94 +34,38 @@ def configure_console_output():
             reconfigure(errors="backslashreplace")
 
 
-def query_terms(query):
-    """Extract useful search words, excluding generic question wording."""
-    terms = []
-    seen = set()
-    for match in QUERY_WORDS.findall(query.casefold()):
-        if len(match) < 3 or match in IGNORED_TERMS or match in seen:
-            continue
-        seen.add(match)
-        terms.append(match)
-    return terms
-
-
-def _like_pattern(term):
-    escaped = term.replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_")
-    return f"%{escaped}%"
-
-
 def search_records(conn, query, limit=12):
-    """Return database records matching words in a query, with stable IDs.
+    """Interaction records for a question, most severe first, with stable ``ddi:`` IDs.
 
-    Both data families are searched in the SQLite database created by
-    ``load_data.py``. No source text, external files, or model memory is used
-    to construct returned records.
+    Only the drugs and interactions tables are read to build the answer. A question with
+    no drug the data knows (and no symptom word) returns nothing.
     """
     if limit < 1:
         raise ValueError("limit must be greater than zero")
+    from ddi_backend.retrieval import candidate_records  # retrieval builds on this module's siblings
 
-    records = {}
-    for term in query_terms(query):
-        pattern = _like_pattern(term)
-        ddi_rows = conn.execute(
-            """SELECT i.interaction_id, i.severity, a.name, b.name,
-                      i.mechanism, i.effect, i.safer_alternative,
-                      i.rationale, i.reference
-               FROM interactions i
-               JOIN drugs a ON a.drug_id = i.drug_a_id
-               JOIN drugs b ON b.drug_id = i.drug_b_id
-               WHERE a.name LIKE ? ESCAPE '\\'
-                  OR b.name LIKE ? ESCAPE '\\'
-                  OR COALESCE(i.effect, '') LIKE ? ESCAPE '\\'
-                  OR COALESCE(i.mechanism, '') LIKE ? ESCAPE '\\'
-               ORDER BY CASE i.severity
-                            WHEN 'Major' THEN 1
-                            WHEN 'Moderate' THEN 2
-                            ELSE 3
-                        END, a.name, b.name
-               LIMIT ?""",
-            (pattern, pattern, pattern, pattern, limit),
-        ).fetchall()
-        for row in ddi_rows:
-            record_id, severity, drug_a, drug_b, mechanism, effect, alternative, rationale, reference = row
-            record = {
-                "id": f"ddi:{record_id}",
-                "source": "drug interaction",
-                "severity": severity,
-                "drug_a": drug_a,
-                "drug_b": drug_b,
-                "mechanism": mechanism,
-                "effect": effect,
-                "safer_alternative": alternative,
-                "rationale": rationale,
-                "reference": reference,
-            }
-            records[record["id"]] = record
+    return candidate_records(conn, query)[:limit]
 
-        hpo_rows = conn.execute(
-            """SELECT DISTINCT t.hp_id, t.label, t.definition, t.comment
-               FROM hpo_terms t
-               LEFT JOIN hpo_synonyms s ON s.hp_id = t.hp_id
-               WHERE t.is_obsolete = 0
-                 AND (t.label LIKE ? ESCAPE '\\'
-                      OR COALESCE(s.synonym, '') LIKE ? ESCAPE '\\')
-               ORDER BY t.label
-               LIMIT ?""",
-            (pattern, pattern, limit),
-        ).fetchall()
-        for hp_id, label, definition, comment in hpo_rows:
-            record = {
-                "id": f"hpo:{hp_id}",
-                "source": "Human Phenotype Ontology",
-                "hp_id": hp_id,
-                "label": label,
-                "definition": definition,
-                "comment": comment,
-            }
-            records[record["id"]] = record
 
-    return list(records.values())[:limit]
+def search_hpo_records(conn, query, limit=12):
+    """Phenotype records for symptom words in the query. A vocabulary, never interaction evidence."""
+    if limit < 1:
+        raise ValueError("limit must be greater than zero")
+    from ddi_backend import hpo
+    from ddi_backend.retrieval import STOPWORDS
+
+    records, seen = [], set()
+    for word in QUERY_WORDS.findall(query.casefold()):
+        if word in STOPWORDS or len(word) < 4:
+            continue
+        for term in hpo.expand_symptom(conn, word)["terms"]:
+            if term["id"] not in seen:
+                seen.add(term["id"])
+                records.append({
+                    "id": term["id"], "source": "Human Phenotype Ontology", "hp_id": term["hp_id"],
+                    "label": term["label"], "definition": term["definition"], "comment": term["comment"],
+                })
+    return records[:limit]
 
 
 def format_record(record):

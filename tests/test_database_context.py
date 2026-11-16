@@ -86,12 +86,17 @@ class TestDatabaseContext(unittest.TestCase):
 
     def test_retrieves_only_matching_interaction_and_phenotype_rows(self):
         interactions = database_context.search_records(self.conn, "What interacts with WARFARIN?")
-        phenotypes = database_context.search_records(self.conn, "hemorrhage symptom")
+        phenotypes = database_context.search_hpo_records(self.conn, "hemorrhage symptom")
 
         self.assertEqual([record["id"] for record in interactions], ["ddi:1"])
         self.assertEqual(interactions[0]["effect"], "Increased bleeding risk")
         self.assertEqual([record["id"] for record in phenotypes], ["hpo:HP:0000001"])
         self.assertEqual(phenotypes[0]["label"], "Bleeding")
+
+    def test_symptom_words_find_interactions_through_their_effect_text_not_hpo_rows(self):
+        # HPO is a vocabulary: it helps find the effect text, and its terms are never returned as evidence.
+        records = database_context.search_records(self.conn, "hemorrhage symptom")
+        self.assertEqual([record["id"] for record in records], ["ddi:1"])
 
     def test_generic_prompt_has_no_matches(self):
         self.assertEqual(

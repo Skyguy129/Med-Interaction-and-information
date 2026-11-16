@@ -38,13 +38,29 @@ class Checker:
         ``registry`` is given); None or False turns it off. ``extra_evidence(names) -> [records]``
         adds records from other sources for a pair; the database never supplies them."""
         self.conn = conn
-        self.graph = Graph.from_connection(conn)
         self.resolver = Resolver.from_connection(conn, aliases=aliases, suggester=suggester)
         self._known = frozenset(ingest.drug_names(conn))
         if eligibility is True:
             eligibility = EligibilityFilter(registry if registry is not None else load_registry())
         self.eligibility = eligibility or None
         self.extra_evidence = extra_evidence
+        # The graph holds only eligible evidence, so avoid lists and the alternative
+        # cross-check never rest on a record that failed the filter.
+        records, self.excluded_evidence = self.eligible_records(ingest.load_interactions(conn))
+        self.graph = Graph(records, ingest.drug_names(conn))
+
+    def eligible_records(self, records):
+        """Split interaction records into (eligible records, excluded Evidence list)."""
+        if self.eligibility is None:
+            return list(records), []
+        kept, excluded = [], []
+        for record in records:
+            evidence = self.eligibility.evaluate(record, (record["drug_a"], record["drug_b"]))
+            if evidence.eligible and evidence.role == ROLE_DIRECT:
+                kept.append(record)
+            else:
+                excluded.append(evidence)
+        return kept, excluded
 
     # ------------------------------------------------------------------
     # Medications
@@ -269,10 +285,12 @@ class Checker:
             return {"status": res.status, "query": res.query, "did_you_mean": res.candidates,
                     "message": res.question, "disclaimer": DISCLAIMER}
         record = ingest.drug_record(self.conn, res.drug_id, self._known)
+        interactions, excluded = self.eligible_records(record["interactions"])
         return {
             "status": RESOLVED,
             "drug": {"drug_id": record["drug_id"], "name": record["name"]},
-            "interactions": record["interactions"],
+            "interactions": interactions,
+            "excluded_evidence": [e.to_dict() for e in excluded],
             "not_available": {
                 field: NOT_AVAILABLE
                 for field in ("uses", "side_effects", "warnings", "contraindications", "ingredients",
