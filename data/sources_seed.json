@@ -1,0 +1,23 @@
+{
+  "_note": "Team designations, not clinical claims. 'approved' means the project designated the source as its interaction source; it does not mean clinically validated. Fill in `owner` with the team member who maintains the data files. effective_date stays null where unknown; never guess it.",
+  "approved_authority_classes": ["course_designated_dataset"],
+  "sources": {
+    "kaggle_ddi": {
+      "label": "DDI_Database.json interaction records",
+      "status": "current",
+      "authority_class": "course_designated_dataset",
+      "scope": "exact_pair",
+      "effective_date": null,
+      "owner": null
+    },
+    "hpo": {
+      "label": "Human Phenotype Ontology (hp.json)",
+      "status": "current",
+      "authority_class": "vocabulary",
+      "scope": "none",
+      "effective_date": "2026-09-01",
+      "effective_date_source": "hp.json graphs[0].meta.version (hp/releases/2026-09-01)",
+      "owner": null
+    }
+  }
+}
