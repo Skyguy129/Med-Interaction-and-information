@@ -1,12 +1,12 @@
 #!/usr/bin/env python3
 """Load the DDI and HPO JSON files into a local SQLite database.
 
-Run from a terminal in this folder:
+Run from the repository root:
 
-    python load_data.py load              # build medications.db from both JSON files
-    python load_data.py stats             # row counts + data-quality report
-    python load_data.py drug warfarin     # interactions that involve a drug
-    python load_data.py hpo bleeding      # search HPO terms and synonyms
+    python -m ddi_backend.load_data load              # build medications.db from both JSON files
+    python -m ddi_backend.load_data stats             # row counts + data-quality report
+    python -m ddi_backend.load_data drug warfarin     # interactions that involve a drug
+    python -m ddi_backend.load_data hpo bleeding      # search HPO terms and synonyms
 
 Only the Python standard library is used (sqlite3, json, argparse).
 Running `load` again rebuilds the tables, so it is safe to repeat.
@@ -19,10 +19,11 @@ import sqlite3
 import sys
 from pathlib import Path
 
-# Paths are relative to this script, so it works no matter where VS Code's
+# Paths are relative to the repository root, so it works no matter where the
 # terminal is opened. Override with --db / --ddi / --hpo.
 HERE = Path(__file__).resolve().parent
-DEFAULT_DB = HERE / "medications.db"
+ROOT = HERE.parent
+DEFAULT_DB = ROOT / "medications.db"
 
 
 def first_existing(path_candidates, fallback):
@@ -33,11 +34,16 @@ def first_existing(path_candidates, fallback):
     return fallback
 
 
+DATA_DIR = ROOT / "data"
 DEFAULT_DDI = first_existing(
-    [HERE / "DDI_Database.json", HERE / "DDI Database.json"],
-    HERE / "DDI_Database.json",
+    [DATA_DIR / "DDI_Database.json", DATA_DIR / "DDI Database.json",
+     ROOT / "DDI_Database.json", ROOT / "DDI Database.json"],
+    DATA_DIR / "DDI_Database.json",
 )
-DEFAULT_HPO = first_existing([HERE / "hp.json", HERE / "HP.json"], HERE / "hp.json")
+DEFAULT_HPO = first_existing(
+    [DATA_DIR / "hp.json", DATA_DIR / "HP.json", ROOT / "hp.json", ROOT / "HP.json"],
+    DATA_DIR / "hp.json",
+)
 
 # --------------------------------------------------------------------------
 # Schema
@@ -372,7 +378,7 @@ def cmd_hpo(args):
 def build_parser():
     common = argparse.ArgumentParser(add_help=False)
     common.add_argument("--db", type=Path, default=DEFAULT_DB,
-                        help="SQLite file (default: medications.db next to this script)")
+                        help="SQLite file (default: medications.db in the repository root)")
 
     parser = argparse.ArgumentParser(description="Load DDI + HPO JSON files into SQLite.")
     sub = parser.add_subparsers(dest="command", required=True)
@@ -400,7 +406,7 @@ def build_parser():
 def main(argv=None):
     args = build_parser().parse_args(argv)
     if args.command != "load" and not Path(args.db).exists():
-        print(f"{args.db} does not exist yet. Run:  python load_data.py load")
+        print(f"{args.db} does not exist yet. Run:  python -m ddi_backend.load_data load")
         return 1
     try:
         return args.func(args)

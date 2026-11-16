@@ -1,0 +1,9 @@
+# Tier 1 (deterministic core, guarded agent, CLI): standard library only.
+# HTTP API (optional; the CLI works without it)
+fastapi>=0.110
+uvicorn>=0.29
+httpx>=0.27          # FastAPI TestClient
+# Tier 2 (optional): embeddings. Retrieval switches itself off if these are missing.
+numpy
+scikit-learn
+sentence-transformers
