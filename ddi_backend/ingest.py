@@ -167,3 +167,31 @@ def load_interactions(conn):
     records.sort(key=lambda r: (severity_rank(r["severity"]), r["drug_a"].casefold(),
                                 r["drug_b"].casefold(), r["id"]))
     return records
+
+
+def pair_records(conn, id_a, id_b, known_drug_names=frozenset()):
+    """Every row for the unordered pair, found by a direct query on the two drug IDs.
+
+    Repeated pairs are returned in full (the loader keeps them on purpose).
+    """
+    rows = conn.execute(
+        INTERACTION_SQL
+        + """ WHERE (i.drug_a_id = ? AND i.drug_b_id = ?) OR (i.drug_a_id = ? AND i.drug_b_id = ?)
+              ORDER BY i.interaction_id""",
+        (id_a, id_b, id_b, id_a),
+    ).fetchall()
+    return [interaction_record(row, known_drug_names) for row in rows]
+
+
+def drug_record(conn, drug_id, known_drug_names=frozenset()):
+    """The drug's name and the interactions it appears in. No monograph data exists."""
+    row = conn.execute("SELECT drug_id, name FROM drugs WHERE drug_id = ?", (drug_id,)).fetchone()
+    if row is None:
+        return None
+    rows = conn.execute(
+        INTERACTION_SQL + " WHERE i.drug_a_id = ? OR i.drug_b_id = ? ORDER BY i.interaction_id",
+        (drug_id, drug_id),
+    ).fetchall()
+    interactions = [interaction_record(r, known_drug_names) for r in rows]
+    interactions.sort(key=lambda r: (severity_rank(r["severity"]), r["id"]))
+    return {"drug_id": row[0], "name": row[1], "interactions": interactions}
