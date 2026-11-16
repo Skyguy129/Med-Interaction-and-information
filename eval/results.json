@@ -1,0 +1,123 @@
+{
+  "pairs": {
+    "documented": 172,
+    "absent": 60,
+    "seed": 0
+  },
+  "backend": {
+    "counts": {
+      "scored": 232,
+      "documented": 172,
+      "correct_severity": 172,
+      "absent": 60
+    },
+    "major": {
+      "total": 63,
+      "recall_exact_severity": 1.0,
+      "recall_any_interaction": 1.0
+    },
+    "claims": {
+      "supported": 688
+    },
+    "unsupported_claims": 0,
+    "failure_codes": {},
+    "confusion_matrix": {
+      "Major": {
+        "Major": 63,
+        "Moderate": 0,
+        "Minor": 0,
+        "None": 0,
+        "Unparseable": 0
+      },
+      "Moderate": {
+        "Major": 0,
+        "Moderate": 48,
+        "Minor": 0,
+        "None": 0,
+        "Unparseable": 0
+      },
+      "Minor": {
+        "Major": 0,
+        "Moderate": 0,
+        "Minor": 61,
+        "None": 0,
+        "Unparseable": 0
+      },
+      "None": {
+        "Major": 0,
+        "Moderate": 0,
+        "Minor": 0,
+        "None": 60,
+        "Unparseable": 0
+      }
+    }
+  },
+  "filter": {
+    "dataset_records": 180,
+    "eligible_records_wrongly_excluded": 0,
+    "wrong_exclusion_rate": 0.0,
+    "excluded_ids": [],
+    "graph_records": 180,
+    "labelled_suite": {
+      "cases": 11,
+      "eligible_cases": 4,
+      "eligible_wrongly_excluded": 0,
+      "ineligible_wrongly_included": 0,
+      "wrong_exclusion_rate": 0.0
+    }
+  },
+  "handout_cases": [
+    {
+      "case": "RAG 1 direct question",
+      "question": "Do warfarin and ibuprofen interact, and how severe is it?",
+      "passed": true
+    },
+    {
+      "case": "RAG 2 paraphrase",
+      "question": "Is it dangerous to take ibuprofen while on warfarin?",
+      "passed": true
+    },
+    {
+      "case": "RAG 3 severity, effect and mechanism",
+      "question": "What are the severity, clinical effect and mechanism of warfarin with fluconazole?",
+      "passed": true
+    },
+    {
+      "case": "RAG 4 distractor: pain reliever and warfarin",
+      "question": "Which pain reliever should I not take with warfarin?",
+      "passed": true
+    },
+    {
+      "case": "RAG 5 absent pair (drugs not in the data)",
+      "question": "Do cabergoline and rucaparib interact?",
+      "passed": true
+    },
+    {
+      "case": "RAG 5 variant: known drugs, no documented row",
+      "question": "Do warfarin and docusate interact?",
+      "passed": true
+    },
+    {
+      "case": "Meeting 7 reworded query, same record",
+      "question": "Does taking clopidogrel with omeprazole reduce the antiplatelet effect?",
+      "passed": true
+    },
+    {
+      "case": "Meeting 8 ambiguity: MS",
+      "question": "What does MS interact with?",
+      "passed": true
+    },
+    {
+      "case": "Meeting 8 negation",
+      "question": "What should I not take with warfarin?",
+      "passed": true
+    },
+    {
+      "case": "Meeting 8 context: children",
+      "question": "Is warfarin with ibuprofen safe for children?",
+      "passed": true
+    }
+  ],
+  "model_label": "no language model",
+  "conditions": {}
+}
