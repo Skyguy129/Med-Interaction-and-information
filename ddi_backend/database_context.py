@@ -1,19 +1,11 @@
 """Search only the DDI and HPO records loaded by load_data.py."""
 
 import re
-import sqlite3
 import sys
-from pathlib import Path
 
-import ddi_backend.load_data as load_data
+from ddi_backend import ingest
 
-REQUIRED_TABLES = {
-    "drugs",
-    "interactions",
-    "hpo_terms",
-    "hpo_synonyms",
-    "hpo_edges",
-}
+REQUIRED_TABLES = ingest.REQUIRED_TABLES
 QUERY_WORDS = re.compile(r"[a-z0-9]+", re.IGNORECASE)
 IGNORED_TERMS = {
     "about",
@@ -62,28 +54,12 @@ IGNORED_TERMS = {
 
 
 def open_database(db_path=None):
-    """Open and validate the database populated by ``load_data.py load``."""
-    path = Path(db_path) if db_path is not None else load_data.DEFAULT_DB
-    if not path.is_file():
-        raise RuntimeError(
-            f"Database not found: {path}. Load both source files first with "
-            f"python -m ddi_backend.load_data load --db \"{path}\"."
-        )
+    """Open and validate the database populated by ``load_data.py load``.
 
-    conn = load_data.connect(path)
-    try:
-        tables = set(load_data.table_names(conn))
-        missing = REQUIRED_TABLES - tables
-        if missing:
-            names = ", ".join(sorted(missing))
-            raise RuntimeError(
-                f"Database is missing required tables: {names}. Load both "
-                f"source files with python -m ddi_backend.load_data load --db \"{path}\"."
-            )
-    except (RuntimeError, sqlite3.Error):
-        conn.close()
-        raise
-    return conn
+    The connection is read-only, so nothing in the application can alter
+    medications.db.
+    """
+    return ingest.open_readonly(db_path, REQUIRED_TABLES)
 
 
 def configure_console_output():
