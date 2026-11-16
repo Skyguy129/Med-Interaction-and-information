@@ -87,7 +87,7 @@ def compose_pair(result, detail="standard"):
     if status == "documented_interaction":
         return compose_documented(result, detail)
     if status == "no_documented_interaction":
-        return (f"No interaction between {a} and {b} is {NOT_DOCUMENTED}. " + NOT_SAFE_NOTE)
+        return f"An interaction between {a} and {b} is {NOT_DOCUMENTED}. " + NOT_SAFE_NOTE
     if status == "evidence_ineligible":
         return result["message"] + " It is flagged for review. " + NOT_SAFE_NOTE
     # ambiguous_name / unknown_drug
@@ -108,7 +108,7 @@ def compose_avoid(avoid_output, detail="standard"):
     entries = avoid_output["avoid"]
     drug = avoid_output["drug"]
     if not entries:
-        return f"No Major or Moderate interaction with {drug} is {NOT_DOCUMENTED}. " + NOT_SAFE_NOTE
+        return f"A Major or Moderate interaction with {drug} is {NOT_DOCUMENTED}. " + NOT_SAFE_NOTE
     lines = [f"Drugs with a documented Major or Moderate interaction with {drug}, most severe first:"]
     for entry in entries:
         extra = ""

@@ -26,7 +26,7 @@ INTERACTION_SQL = """
 """
 
 
-def open_readonly(db_path=None, required=REQUIRED_TABLES):
+def open_readonly(db_path=None, required=REQUIRED_TABLES, check_same_thread=True):
     """Open the database read-only and check that the required tables exist.
 
     Never creates the file: a missing database raises RuntimeError with the
@@ -38,7 +38,7 @@ def open_readonly(db_path=None, required=REQUIRED_TABLES):
         raise RuntimeError(
             f"Database not found: {path}. Load both source files first with {load_cmd}."
         )
-    conn = sqlite3.connect(f"{path.resolve().as_uri()}?mode=ro", uri=True)
+    conn = sqlite3.connect(f"{path.resolve().as_uri()}?mode=ro", uri=True, check_same_thread=check_same_thread)
     try:
         conn.execute("PRAGMA query_only = ON")
         missing = set(required) - set(load_data.table_names(conn))
