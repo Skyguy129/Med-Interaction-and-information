@@ -16,7 +16,7 @@ import tempfile
 import unittest
 from pathlib import Path
 
-import load_data
+import ddi_backend.load_data as load_data
 
 IRI = "http://purl.obolibrary.org/obo/"
 
