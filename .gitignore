@@ -8,3 +8,4 @@ medications.db
 agent_state.db
 app_state.db
 *.embeddings.npz
+data/graph_export/
