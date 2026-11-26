@@ -1,0 +1,106 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Medication Interaction Checker</title>
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+  <!-- Disclaimer: always visible on every screen -->
+  <div class="disclaimer" role="note">
+    <strong>Class prototype. Not medical advice.</strong>
+    It only reports what our project data documents. Talk to a pharmacist or clinician before starting, stopping or changing any medication.
+  </div>
+
+  <header class="top">
+    <div>
+      <h1>Medication Interaction Checker</h1>
+      <p class="sub">Check a new medication against the ones you already take.</p>
+    </div>
+    <div class="status" id="health" title="Connection to the backend">
+      <span class="dot"></span><span id="health-text">Connecting…</span>
+    </div>
+  </header>
+
+  <nav class="tabs" role="tablist">
+    <button class="tab active" data-tab="check" role="tab">Check medications</button>
+    <button class="tab" data-tab="ask" role="tab">Ask a question</button>
+    <button class="tab" data-tab="queue" role="tab">Review queue</button>
+  </nav>
+
+  <main>
+    <!-- TAB 1: CHECK -->
+    <section id="tab-check" class="panel">
+      <form id="check-form" class="card" autocomplete="off">
+        <h2>Medications you already take</h2>
+        <div id="current-list"></div>
+        <button type="button" class="link" id="add-med">+ Add another medication</button>
+
+        <h2 class="spaced">New medication you are considering</h2>
+        <div class="row">
+          <input id="new-name" type="text" placeholder="Drug name, e.g. Ibuprofen" aria-label="New medication name" required />
+          <input id="new-dose" type="text" placeholder="Dose (optional)" aria-label="New medication dose" class="dose" />
+        </div>
+        <p class="hint">Doses are shown back to you but never evaluated or recommended.</p>
+
+        <label class="check">
+          <input type="checkbox" id="include-pairs" />
+          Also check my current medications against each other
+        </label>
+
+        <div class="actions">
+          <button type="submit" class="primary" id="check-btn">Check interactions</button>
+          <button type="button" class="ghost" id="example-btn">Try an example</button>
+        </div>
+      </form>
+      <div id="check-results" aria-live="polite"></div>
+    </section>
+
+    <!-- TAB 2: ASK -->
+    <section id="tab-ask" class="panel" hidden>
+      <form id="ask-form" class="card">
+        <h2>Ask a question about interactions</h2>
+        <textarea id="question" rows="3" placeholder="e.g. Which drugs should I avoid with warfarin?" required></textarea>
+        <div class="chips" id="sample-questions"></div>
+        <div class="actions"><button type="submit" class="primary" id="ask-btn">Ask</button></div>
+        <p class="hint">Our data holds interactions only: not uses, side effects, doses or brand names.</p>
+      </form>
+      <div id="ask-results" aria-live="polite"></div>
+    </section>
+
+    <!-- TAB 3: REVIEW QUEUE -->
+    <section id="tab-queue" class="panel" hidden>
+      <div class="card">
+        <div class="between">
+          <h2>Simulated pharmacist-review queue</h2>
+          <button class="ghost" id="refresh-queue">Refresh</button>
+        </div>
+        <p class="hint sim-note">SIMULATED: nothing here reaches a real pharmacist, patient or medical record.</p>
+        <div id="queue-list"></div>
+      </div>
+    </section>
+  </main>
+
+  <!-- Approval dialog for staging a review -->
+  <dialog id="review-dialog">
+    <form method="dialog" id="review-form">
+      <h3>Send to simulated review queue</h3>
+      <p id="review-pair" class="pairname"></p>
+      <p class="hint">This stages the documented interaction for clinician review in a <strong>simulated</strong> queue. Nothing is sent to a real person.</p>
+      <label class="check"><input type="checkbox" id="review-approve" /> I approve staging this for review.</label>
+      <p id="review-msg" class="msg" aria-live="polite"></p>
+      <div class="actions">
+        <button type="button" class="ghost" id="review-cancel">Close</button>
+        <button type="submit" class="primary" id="review-send">Stage for review</button>
+      </div>
+    </form>
+  </dialog>
+
+  <footer>
+    Class project, CSCI 4150. Backend: <code id="api-url"></code>
+  </footer>
+
+  <script src="app.js"></script>
+</body>
+</html>
