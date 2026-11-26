@@ -26,8 +26,8 @@ class TestGetReply(unittest.TestCase):  # tests for the function that calls the 
     def test_posts_database_candidates_as_json_selection_request(self):  # checks the exact request that is sent
         response = io.BytesIO(  # a fake HTTP response body held in memory
             json.dumps(
-                # shaped like a chat completion whose content selects record ddi:1
-                {"choices": [{"message": {"content": '{"record_ids":["ddi:1"]}'}}]}
+                # shaped like a Messages API response whose text selects record ddi:1
+                {"content": [{"type": "text", "text": '{"record_ids":["ddi:1"]}'}]}
             ).encode("utf-8")
         )
         messages = [{"role": "user", "content": "select records"}]  # the messages we will send
@@ -39,11 +39,13 @@ class TestGetReply(unittest.TestCase):  # tests for the function that calls the 
         self.assertEqual(reply, '{"record_ids":["ddi:1"]}')  # the reply text was extracted correctly
         request = urlopen.call_args.args[0]  # the request object that would have been sent
         self.assertEqual(request.full_url, llm_chat.API_URL)  # it went to the configured API address
-        self.assertEqual(request.get_header("Authorization"), "Bearer test-key")  # the key was sent as a bearer token
+        self.assertEqual(request.get_header("X-api-key"), "test-key")  # Anthropic API key header
+        self.assertEqual(request.get_header("Anthropic-version"), "2023-06-01")  # required API version
         payload = json.loads(request.data)  # decode the JSON body that was sent
         self.assertEqual(payload["model"], "test-model")  # the model name was included
-        self.assertEqual(payload["messages"], messages)  # the messages were passed through unchanged
-        self.assertEqual(payload["response_format"], {"type": "json_object"})  # JSON output was requested
+        self.assertEqual(payload["system"], "")  # no system message was supplied
+        self.assertEqual(payload["messages"], messages)  # user messages pass through
+        self.assertEqual(payload["max_tokens"], 1024)  # required output limit
 
     def test_reports_http_error(self):  # an HTTP failure becomes a readable RuntimeError
         error = llm_chat.HTTPError(  # build a fake 401 error
@@ -59,9 +61,9 @@ class TestGetReply(unittest.TestCase):  # tests for the function that calls the 
                 llm_chat.get_reply([], "bad-key")
 
     def test_rejects_response_without_reply(self):  # a response with no choices is an error
-        response = io.BytesIO(b'{"choices":[]}')  # fake body with an empty choices list
+        response = io.BytesIO(b'{"content": []}')  # fake body with no text reply
         with mock.patch("ddi_backend.llm_chat.urlopen", return_value=response):  # return it from the fake network
-            with self.assertRaisesRegex(RuntimeError, "did not contain"):  # error says there was no reply
+            with self.assertRaisesRegex(RuntimeError, "empty assistant reply"):  # no text block was returned
                 llm_chat.get_reply([], "test-key")
 
 
@@ -97,7 +99,7 @@ class TestMain(unittest.TestCase):  # tests for the interactive chat loop
         output = io.StringIO()  # buffer for printed output
         conn = mock.Mock()  # fake database connection
         with (  # patch the key, database, search, model call and input
-            mock.patch.dict(os.environ, {"OPENAI_API_KEY": "test-key"}),  # pretend a key is set
+            mock.patch.dict(os.environ, {"ANTHROPIC_API_KEY": "test-key"}),  # pretend a key is set
             mock.patch("ddi_backend.llm_chat.open_database", return_value=conn),  # fake database
             # search returns the one candidate; "search" records the call
             mock.patch("ddi_backend.llm_chat.search_records", return_value=[INTERACTION]) as search,
@@ -124,7 +126,7 @@ class TestMain(unittest.TestCase):  # tests for the interactive chat loop
         prompts = iter(["unmatched query", "/exit"])  # scripted input
         output = io.StringIO()  # buffer for printed output
         with (  # patch the key, database, search, model call and input
-            mock.patch.dict(os.environ, {"OPENAI_API_KEY": "test-key"}),  # pretend a key is set
+            mock.patch.dict(os.environ, {"ANTHROPIC_API_KEY": "test-key"}),  # pretend a key is set
             mock.patch("ddi_backend.llm_chat.open_database", return_value=mock.Mock()),  # fake database
             mock.patch("ddi_backend.llm_chat.search_records", return_value=[]),  # search finds nothing
             mock.patch("ddi_backend.llm_chat.get_reply") as get_reply,  # watch the model call
@@ -148,7 +150,7 @@ class TestMain(unittest.TestCase):  # tests for the interactive chat loop
             result = llm_chat.main([])  # run the chat
 
         self.assertEqual(result, 1)  # failure exit code
-        self.assertIn("OPENAI_API_KEY", output.getvalue())  # the message names the missing variable
+        self.assertIn("ANTHROPIC_API_KEY", output.getvalue())  # the message names the missing variable
         conn.close.assert_called_once()  # the database connection was still closed
 
     def test_reports_database_validation_error(self):  # a database problem is reported
@@ -169,7 +171,7 @@ if __name__ == "__main__":  # only when run directly as a script
 
 # ---------------------------------------------------------------------------
 # FILE SUMMARY: Tests the selector-mode chat (ddi_backend/llm_chat.py) with no network. It checks the request
-# sent to the model (key, model, JSON mode), that the model sees only the question and candidate records, that
+# sent to the model (key, model and Messages API structure), that the model sees only the question and candidate records, that
 # only IDs from the candidate list are accepted and the stored rows are printed, that no candidates means no API
 # call, and that a missing key or database error is reported cleanly.
 # ASSIGNMENT TOOL: the language model tool, selector mode (the model picks record IDs and the program prints the

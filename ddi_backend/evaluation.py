@@ -506,8 +506,8 @@ def format_report(results):
     for name, score in results["conditions"].items():  # one section per model condition
         lines += table(f"Language model, {name} ({results['model_label']})", score)
     if not results["conditions"]:  # no model was run: say so rather than leaving a gap
-        lines += ["## Language model", "", "Not run: no language model was configured. Set OPENAI_API_KEY and run "
-                  "`python eval/run_eval.py --llm openai`.", ""]
+        lines += ["## Language model", "", "Not run: no language model was configured. Set ANTHROPIC_API_KEY and run "
+              "`python eval/run_eval.py --llm claude`.", ""]
     lines += ["## Handout and Meeting 8 questions", "", "| Case | Result |", "|---|---|"]  # fixed-cases table header
     lines += [f"| {r['case']} | {'pass' if r['passed'] else 'FAIL'} |" for r in results["handout_cases"]]
     lines.append("")

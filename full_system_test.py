@@ -16,7 +16,7 @@ For every question it runs the real pipeline and prints each step:
                             a validator rejects any new fact and falls back to the template text
   6. the answer             shown next to the source records it came from
 
-With OPENAI_API_KEY set (or typed when asked) the model writes the response. Without a key the template
+With ANTHROPIC_API_KEY set (or typed when asked) the model writes the response. Without a key the template
 composer writes it, and everything else is identical. The model never decides anything and never writes
 to a database. Class prototype, not medical advice.
 
@@ -26,7 +26,7 @@ Inside the chat, type /help for commands (/meds, /new, /detail, /context, /llm, 
 import argparse  # command-line options
 import getpass  # reads an API key without echoing it
 import json  # builds and parses the model's JSON messages
-import os  # reads OPENAI_MODEL
+import os  # reads ANTHROPIC_MODEL
 import re  # splits the medication list and matches names in text
 import sys  # stderr, sys.path, exit code
 from pathlib import Path  # file paths
@@ -307,7 +307,7 @@ def handle_command(session, line, input_fn):
             print("Choose one of:", ", ".join(llm.CONTEXT_LEVELS))
     elif command == "/llm":  # turn the model on or off for this session
         if rest == "on" and session.provider is None:  # cannot turn on without a key
-            print("No language model is configured (set OPENAI_API_KEY and restart).")
+            print("No language model is configured (set ANTHROPIC_API_KEY and restart).")
         elif rest in ("on", "off"):
             session.use_llm = rest == "on"
             print("language model:", "on" if session.use_llm else "off")
@@ -384,11 +384,11 @@ def main(argv=None, input_fn=input, key_fn=getpass.getpass):
     args = build_parser().parse_args(argv)  # read the options
     provider = None  # no language model unless one is configured
     if not args.no_llm:
-        provider = llm.provider_from_env()  # use OPENAI_API_KEY if it is set
+        provider = llm.provider_from_env()  # use ANTHROPIC_API_KEY if it is set
         if provider is None and not args.no_key_prompt:  # offer to take a key for this session only
-            key = key_fn("OPENAI_API_KEY is not set. Paste a key for this session only (Enter to skip): ").strip()
+            key = key_fn("ANTHROPIC_API_KEY is not set. Paste a key for this session only (Enter to skip): ").strip()
             if key:
-                provider = llm.OpenAIProvider(key, os.environ.get("OPENAI_MODEL", "gpt-4o-mini"))  # key is never stored
+                provider = llm.AnthropicProvider(key, os.environ.get("ANTHROPIC_MODEL", "claude-sonnet-4-5"))  # key is never stored
     try:
         # Build the shared backend with the chosen options.
         app = App(db_path=args.db, state_path=args.state, embeddings=args.embeddings,

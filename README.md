@@ -156,7 +156,7 @@ example clopidogrel with omeprazole as Major and Moderate) returns every row, he
 |---|---|---|
 | 1 | `medications.db` | The deterministic core, the guarded agent, the CLI and the API. |
 | 2 | numpy, sentence-transformers | Embeddings (`all-MiniLM-L6-v2`, pinned revision, cosine similarity) for candidates, did-you-mean names and symptom-word candidates. One record is one document; HPO has its own index; vectors are computed once and cached beside `agent_state.db`. |
-| 3 | `OPENAI_API_KEY` | The language model. `OPENAI_MODEL` defaults to `gpt-4o-mini`; no key is ever in code. |
+| 3 | `ANTHROPIC_API_KEY` | Claude explanations and record selection. `ANTHROPIC_MODEL` defaults to `claude-sonnet-4-5`; no key is in code. |
 
 Each tier has its own tests, and the absence or failure of tier two or three never breaks tier one. If the embedding
 model cannot be downloaded or loaded, retrieval switches itself off and the system falls back to exact names plus
@@ -165,7 +165,7 @@ turns them on).
 
 ## The language model
 
-Two modes, behind a small provider interface (OpenAI first, through `urllib`).
+Two modes, behind a small Anthropic Messages API provider using `urllib`.
 
 - **Selector** (`llm_chat.py`, unchanged): the model sees only the question and the candidate records and returns
   `{"record_ids": [...]}`. The program checks the key set, the types and that every ID is a candidate, then prints
@@ -221,14 +221,14 @@ frontend is served from another origin.
 `python eval\run_eval.py` runs the same pairs (every documented pair plus a seeded sample of pairs with no row) through
 the backend and writes `eval/report.md` with missed known interactions, false interactions, wrong severity, unsupported
 claims, **Major recall on its own**, a severity confusion matrix, the handout and Meeting 8 questions, and how often the
-filter wrongly excludes an eligible record. With `--llm openai` it also runs the four language-model conditions on the
+filter wrongly excludes an eligible record. With `--llm claude` it also runs the four language-model conditions on the
 same pairs, changing one variable at a time: names-only vs full-context (synthetic doses and other medications) and brief
 vs detailed. Model claims are labelled supported, plausible but unsupported, or contradicted, with R1/G1 codes.
 
 What has been run: the deterministic backend (0 of 172 known interactions missed, 0 of 60 false interactions, 0 wrong
 severities, Major recall 100% of 63, filter wrong-exclusion rate 0 of 180) and the harness against a scripted stand-in
 model, which is **simulated** and only shows that the harness catches misses, false interactions and wrong severities.
-**No real language-model numbers are reported yet**: they need your `OPENAI_API_KEY`.
+**No real language-model numbers are reported yet**: they need your `ANTHROPIC_API_KEY`.
 
 ## Things to know
 

@@ -248,7 +248,7 @@ class TestReportAndScript(unittest.TestCase):  # tests the report text and the e
             self.assertTrue((Path(tmp) / "report.md").is_file())  # the report was written
             self.assertTrue(json.loads((Path(tmp) / "results.json").read_text(encoding="utf-8"))["backend"])  # results.json has backend data
 
-    def test_openai_mode_needs_a_key(self):  # --llm openai without a key must fail clearly
+    def test_claude_mode_needs_a_key(self):  # --llm claude without a key must fail clearly
         import importlib.util  # imported here, only needed by this test
         # Load eval/run_eval.py by path, as above.
         spec = importlib.util.spec_from_file_location("run_eval", Path(__file__).resolve().parent.parent / "eval" / "run_eval.py")
@@ -256,9 +256,9 @@ class TestReportAndScript(unittest.TestCase):  # tests the report text and the e
         spec.loader.exec_module(module)  # run the script's top level
         from unittest import mock  # imported here, only needed by this test
         with mock.patch.dict("os.environ", {}, clear=True), contextlib.redirect_stderr(io.StringIO()) as err:  # no key in the environment, capture errors
-            code = module.main(["--db", str(support.real_db_path()), "--llm", "openai"])  # ask for the OpenAI mode
+            code = module.main(["--db", str(support.real_db_path()), "--llm", "claude"])  # request Claude mode
         self.assertEqual(code, 1)  # failure exit code
-        self.assertIn("OPENAI_API_KEY", err.getvalue())  # the message names the missing variable
+        self.assertIn("ANTHROPIC_API_KEY", err.getvalue())  # the message names the missing variable
 
 
 if __name__ == "__main__":  # only when the file is run directly

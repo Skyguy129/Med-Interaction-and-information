@@ -11,11 +11,11 @@ The model never decides anything and never triggers a write.
 """
 
 import json  # builds the model request and parses its reply
-import os  # reads OPENAI_API_KEY and OPENAI_MODEL
+import os  # reads ANTHROPIC_API_KEY and ANTHROPIC_MODEL
 import re  # regular expressions for word and number checks
 from dataclasses import dataclass  # makes the small immutable Settings class
 
-from ddi_backend import composer, llm_chat  # template fallback, and the shared OpenAI call
+from ddi_backend import composer, llm_chat  # template fallback, and the shared Anthropic call
 from ddi_backend.common import DISCLAIMER  # the not-medical-advice line attached to every response
 
 CONTEXT_LEVELS = ("names_only", "full_context")  # how much patient context the model may see
@@ -49,9 +49,9 @@ class Provider:  # base class for any model provider
         raise NotImplementedError  # the base class does nothing
 
 
-class OpenAIProvider(Provider):  # the OpenAI implementation
-    """OpenAI Chat Completions through urllib, as in llm_chat. The key and model come from the environment."""
-    name = "openai"  # label for this provider
+class AnthropicProvider(Provider):  # the Anthropic implementation
+    """Anthropic Messages API through urllib, as in llm_chat."""
+    name = "anthropic"  # label for this provider
 
     def __init__(self, api_key, model=llm_chat.DEFAULT_MODEL):  # store the key and model
         self.api_key, self.model = api_key, model  # kept on the object, never written anywhere
@@ -61,12 +61,12 @@ class OpenAIProvider(Provider):  # the OpenAI implementation
 
 
 def provider_from_env(environ=None):  # choose a provider from environment settings
-    """OpenAIProvider when OPENAI_API_KEY is set, otherwise None (deterministic-only)."""
+    """AnthropicProvider when ANTHROPIC_API_KEY is set, otherwise None (deterministic-only)."""
     environ = os.environ if environ is None else environ  # tests can pass a fake environment
-    key = environ.get("OPENAI_API_KEY")  # the key, if any
+    key = environ.get("ANTHROPIC_API_KEY")  # the key, if any
     if not key:  # no key means no model
         return None  # deterministic-only mode
-    return OpenAIProvider(key, environ.get("OPENAI_MODEL", llm_chat.DEFAULT_MODEL))  # model name from the environment or the default
+    return AnthropicProvider(key, environ.get("ANTHROPIC_MODEL", llm_chat.DEFAULT_MODEL))  # model or default
 
 
 # --------------------------------------------------------------------------

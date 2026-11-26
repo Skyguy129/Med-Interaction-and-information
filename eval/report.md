@@ -28,7 +28,7 @@ Severity confusion matrix (rows: dataset, columns: system):
 
 ## Language model
 
-Not run: no language model was configured. Set OPENAI_API_KEY and run `python eval/run_eval.py --llm openai`.
+Not run: no language model was configured. Set ANTHROPIC_API_KEY and run `python eval/run_eval.py --llm claude`.
 
 ## Handout and Meeting 8 questions
 

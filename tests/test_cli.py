@@ -67,7 +67,7 @@ class TestCheck(CliTestCase):
         self.assertIn("does not mean the combination is safe", out)  # and not called safe
 
     def test_explain_without_a_key_uses_the_template(self):
-        with mock.patch.dict("os.environ", {}, clear=True):  # no OPENAI_API_KEY in the environment
+        with mock.patch.dict("os.environ", {}, clear=True):  # no Anthropic key in the environment
             _, out, _ = run(["check", "--current", "Warfarin", "--new", "Fluconazole", "--explain", *self.base()])
         self.assertIn("(written by: template)", out)  # the template composer wrote the explanation
         self.assertIn("[drug interaction] ddi:12", out)  # the source record is printed beside the text

@@ -31,7 +31,7 @@ def run(lines, extra=(), key=""):  # helper: run the script with scripted typed 
 
 class TestWithoutAKey(unittest.TestCase):  # tests the deterministic mode, with no API key
     def test_deterministic_answer_shows_steps_response_and_source(self):  # a normal pair question
-        with mock.patch.dict("os.environ", {}, clear=True):  # empty environment, so no OPENAI_API_KEY
+        with mock.patch.dict("os.environ", {}, clear=True):  # empty environment, so no Anthropic key
             code, out, _ = run(["Do warfarin and ibuprofen interact?", "/quit"])  # ask, then quit
         self.assertEqual(code, 0)  # clean exit
         # Phrases that must appear: the numbered steps, the template composer, the answer, the source, and the disclaimer.
@@ -64,14 +64,14 @@ class TestWithoutAKey(unittest.TestCase):  # tests the deterministic mode, with 
 
 
 class TestWithAModel(unittest.TestCase):  # tests the language-model mode using a scripted stand-in provider
-    def provider(self, reply):  # helper: an OpenAI provider whose network call is replaced with a canned reply
-        provider = llm.OpenAIProvider("test-key")  # constructed with a dummy key, never contacted
+    def provider(self, reply):  # helper: an Anthropic provider whose network call is replaced with a canned reply
+        provider = llm.AnthropicProvider("test-key")  # constructed with a dummy key, never contacted
         provider.complete = lambda messages: reply if isinstance(reply, str) else json.dumps(reply)  # strings pass through, dicts become JSON
         return provider
 
     def run_with(self, reply, lines):  # helper: run the script with the fake key and the scripted provider
         # Backslash continuation below, so this note sits above: set a fake key and make the provider lookup return our stand-in.
-        with mock.patch.dict("os.environ", {"OPENAI_API_KEY": "test-key"}), \
+        with mock.patch.dict("os.environ", {"ANTHROPIC_API_KEY": "test-key"}), \
                 mock.patch.object(llm, "provider_from_env", return_value=self.provider(reply)):
             return run(lines)  # run the scripted conversation
 
@@ -106,7 +106,7 @@ class TestWithAModel(unittest.TestCase):  # tests the language-model mode using 
         self.assertIn("most severe first", out)  # and the deterministic list is shown instead
 
     def test_provider_errors_fall_back(self):  # a failing model call must not break the run
-        provider = llm.OpenAIProvider("k")  # provider with a dummy key
+        provider = llm.AnthropicProvider("k")  # provider with a dummy key
         provider.complete = mock.Mock(side_effect=RuntimeError("HTTP 500"))  # every call raises
         with mock.patch.object(llm, "provider_from_env", return_value=provider):  # make the script use this provider
             _, out, _ = run(["What should I not take with warfarin?", "/quit"])  # ask a question

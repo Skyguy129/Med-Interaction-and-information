@@ -1,8 +1,8 @@
-# Module docstring: what the script writes and the three ways to run it (no model, OpenAI, simulated stand-in).
+# Module docstring: what the script writes and the three ways to run it (no model, Claude, simulated stand-in).
 """Run the evaluation and write eval/report.md and eval/results.json.
 
     python eval/run_eval.py                          # deterministic backend and the filter check only
-    python eval/run_eval.py --llm openai             # also the 2x2 language-model conditions (needs OPENAI_API_KEY)
+    python eval/run_eval.py --llm claude             # also the 2x2 language-model conditions (needs ANTHROPIC_API_KEY)
     python eval/run_eval.py --llm simulated          # scripted stand-in model, to see the report shape (SIMULATED)
 
 The language-model conditions are names-only vs full-context and brief vs detailed, all on the same pairs.
@@ -29,7 +29,7 @@ def main(argv=None):
     # Use the first docstring line as the help text.
     parser = argparse.ArgumentParser(description=__doc__.split("\n")[0])
     parser.add_argument("--db", type=Path, default=load_data.DEFAULT_DB)  # which medications.db to evaluate
-    parser.add_argument("--llm", choices=("none", "openai", "simulated"), default="none")  # model condition to run
+    parser.add_argument("--llm", choices=("none", "claude", "simulated"), default="none")  # model condition to run
     parser.add_argument("--simulated-mode", choices=("oracle", "noisy"), default="noisy")  # how the stand-in behaves
     parser.add_argument("--negatives", type=int, default=60, help="pairs with no documented row to add")  # no-row pairs
     parser.add_argument("--seed", type=int, default=0)  # seed so the sampled pairs are repeatable
@@ -47,12 +47,12 @@ def main(argv=None):
         reg = registry.load_registry()  # source registry used by the eligibility filter
         checker = Checker(conn, registry=reg)  # the backend under test
         provider, label = None, "no language model"  # default: deterministic only
-        if args.llm == "openai":  # real model requested
-            provider = llm.provider_from_env()  # build the provider from OPENAI_API_KEY, or None
+        if args.llm == "claude":  # real model requested
+            provider = llm.provider_from_env()  # build the provider from ANTHROPIC_API_KEY, or None
             if provider is None:  # no key available
-                print("Error: --llm openai needs OPENAI_API_KEY in the environment.", file=sys.stderr)
+                print("Error: --llm claude needs ANTHROPIC_API_KEY in the environment.", file=sys.stderr)
                 return 1  # stop, since the real model cannot run
-            label = f"openai {provider.model}"  # label the report with the model name
+            label = f"Claude ({provider.model})"  # label the report with the model name
         elif args.llm == "simulated":  # scripted stand-in requested
             # The stand-in answers from the known truth (oracle) or with seeded mistakes (noisy).
             provider = evaluation.SimulatedProvider(evaluation.ground_truth(checker), args.simulated_mode, args.seed)

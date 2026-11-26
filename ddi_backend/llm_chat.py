@@ -1,5 +1,5 @@
 # Module docstring: explains the selector-mode chat where the model only picks record IDs.
-"""A small terminal chat client for the OpenAI Chat Completions API.
+"""A small terminal chat client for the Anthropic Messages API.
 
 The client only displays rows retrieved from the DDI/HPO SQLite database
 created by ``load_data.py``. The API model selects relevant record IDs; the
@@ -9,16 +9,16 @@ prose.
 Load both source databases first:
     python -m ddi_backend.load_data load
 
-Set OPENAI_API_KEY in the environment, then run:
+Set ANTHROPIC_API_KEY in the environment, then run:
     python -m ddi_backend.llm_chat
 
-The optional OPENAI_MODEL environment variable selects the model. Use --db to
+The optional ANTHROPIC_MODEL environment variable selects the model. Use --db to
 select another loaded database. Type /quit or /exit to end the chat.
 """
 
 import argparse  # command-line options
 import json  # builds the request body and parses replies
-import os  # reads OPENAI_API_KEY and OPENAI_MODEL
+import os  # reads ANTHROPIC_API_KEY and ANTHROPIC_MODEL
 import sqlite3  # sqlite3.Error is caught in the chat loop
 import sys  # stderr and exit codes
 from urllib.error import HTTPError, URLError  # error types for failed web requests
@@ -32,8 +32,8 @@ from ddi_backend.database_context import (  # shared read-only database helpers
     search_records,  # finds candidate rows for a prompt
 )
 
-API_URL = "https://api.openai.com/v1/chat/completions"  # the provider endpoint
-DEFAULT_MODEL = "gpt-4o-mini"  # used when OPENAI_MODEL is not set
+API_URL = "https://api.anthropic.com/v1/messages"  # the provider endpoint
+DEFAULT_MODEL = "claude-sonnet-4-5"  # used when ANTHROPIC_MODEL is not set
 SYSTEM_MESSAGE = (  # the rule sent to the model: select IDs only, add nothing
     "You are a database record selector, not a conversational answerer. "  # role: selector only
     "The only permitted source is the candidate records supplied by the "  # sole source of information
@@ -47,18 +47,23 @@ SYSTEM_MESSAGE = (  # the rule sent to the model: select IDs only, add nothing
 
 def get_reply(messages, api_key, model=DEFAULT_MODEL):  # call the API and return its text
     """Ask the API to select candidate database record IDs as JSON."""
-    body = json.dumps(  # turn the request into JSON text
-        {  # request fields
-            "model": model,  # which model to use
-            "messages": messages,  # system and user messages
-            "response_format": {"type": "json_object"},  # ask for a JSON object back
-        }
-    ).encode("utf-8")  # the web client needs bytes
+    system_messages = [message["content"] for message in messages if message.get("role") == "system"]
+    api_messages = [  # Anthropic accepts system instructions separately from conversation messages
+        {"role": message["role"], "content": message["content"]}
+        for message in messages if message.get("role") != "system"
+    ]
+    body = json.dumps({  # turn the request into Anthropic Messages API JSON
+        "model": model,
+        "max_tokens": 1024,
+        "system": "\n\n".join(system_messages),
+        "messages": api_messages,
+    }).encode("utf-8")  # the web client needs bytes
     request = Request(  # build the HTTP request
         API_URL,  # where to send it
         data=body,  # the JSON body
         headers={  # request headers
-            "Authorization": f"Bearer {api_key}",  # the key comes from the environment, never from code
+            "x-api-key": api_key,  # the key comes from the environment, never from code
+            "anthropic-version": "2023-06-01",
             "Content-Type": "application/json",  # we send JSON
             "Accept": "application/json",  # we want JSON back
         },
@@ -80,8 +85,8 @@ def get_reply(messages, api_key, model=DEFAULT_MODEL):  # call the API and retur
         raise RuntimeError(f"Could not read a valid response from the LLM API: {error}") from error  # report it
 
     try:  # dig the reply text out of the response
-        reply = result["choices"][0]["message"]["content"]  # standard Chat Completions shape
-    except (KeyError, IndexError, TypeError) as error:  # unexpected shape
+        reply = "".join(block["text"] for block in result["content"] if block.get("type") == "text")
+    except (KeyError, TypeError) as error:  # unexpected shape
         raise RuntimeError("The LLM API response did not contain an assistant reply.") from error  # report it
 
     if not isinstance(reply, str) or not reply.strip():  # empty or non-text reply
@@ -166,17 +171,17 @@ def main(argv=None):  # entry point for the selector chat
         print(f"Error: {error}", file=sys.stderr)  # report it
         return 1  # failure exit code
 
-    api_key = os.environ.get("OPENAI_API_KEY")  # the key lives only in the environment
+    api_key = os.environ.get("ANTHROPIC_API_KEY")  # the key lives only in the environment
     if not api_key:  # no key
         print(  # explain what to do
-            "OPENAI_API_KEY is not set. Set it in your terminal environment "
+            "ANTHROPIC_API_KEY is not set. Set it in your terminal environment "
             "before starting the chat.",
             file=sys.stderr,  # error output
         )
         conn.close()  # release the database
         return 1  # failure exit code
 
-    model = os.environ.get("OPENAI_MODEL", DEFAULT_MODEL)  # chosen model, or the default
+    model = os.environ.get("ANTHROPIC_MODEL", DEFAULT_MODEL)  # chosen model, or the default
     print(  # startup banner
         f"Database-grounded chat started using {model}. The API can select "  # which model is in use
         "records only; displayed answers are exact database rows. "  # reminder of the safeguard

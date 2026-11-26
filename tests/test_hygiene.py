@@ -76,7 +76,7 @@ class TestConventions(unittest.TestCase):  # tests repository conventions
         self.assertEqual(offenders, [])  # there must be none
 
     def test_no_api_key_in_the_repository(self):  # a real key must never be committed
-        pattern = re.compile(r"sk-[A-Za-z0-9_-]{20,}")  # the shape of an OpenAI-style key
+        pattern = re.compile(r"sk-[A-Za-z0-9_-]{20,}")  # common secret-key prefix pattern
         # Text files (except the big hp.json) that contain something shaped like a key.
         offenders = [str(p.relative_to(ROOT)) for p in repo_files(".py", ".md", ".json", ".txt")
                      if p.name not in {"hp.json"} and pattern.search(p.read_text(encoding="utf-8", errors="replace"))]
@@ -102,7 +102,7 @@ class TestConventions(unittest.TestCase):  # tests repository conventions
         code = (  # a small program run in a fresh Python process; its pieces are joined into one string
             "import sys; sys.path.insert(0, sys.argv[1]);"  # make the repository importable
             "import ddi_backend.checker, ddi_backend.agent, ddi_backend.retrieval, ddi_backend.cli;"  # import the core modules
-            "bad = [m for m in ('numpy', 'sklearn', 'sentence_transformers', 'torch', 'fastapi', 'openai') if m in sys.modules];"  # optional libraries that got loaded
+            "bad = [m for m in ('numpy', 'sklearn', 'sentence_transformers', 'torch', 'fastapi', 'anthropic') if m in sys.modules];"  # optional libraries that got loaded
             "sys.exit(1 if bad else 0)"  # fail if any optional library was imported
         )
         result = subprocess.run([sys.executable, "-I", "-c", code, str(ROOT)], capture_output=True, text=True)  # run it in isolated mode

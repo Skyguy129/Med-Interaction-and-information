@@ -286,8 +286,8 @@ class TestPersistence(unittest.TestCase):
             elif isinstance(node, ast.ImportFrom):  # "from x import y"
                 imported.add(node.module)  # the module
                 imported |= {f"{node.module}.{a.name}" for a in node.names}  # and each name from it
-        # None of the imports may mention a language-model, OpenAI or urllib module.
-        self.assertEqual([name for name in imported if "llm" in name or "openai" in name or "urllib" in name], [])
+        # None of the imports may mention a language-model, Anthropic or urllib module.
+        self.assertEqual([name for name in imported if "llm" in name or "anthropic" in name or "urllib" in name], [])
 
 
 # Tests the human-readable trace of an attempt.

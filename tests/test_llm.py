@@ -12,7 +12,7 @@ from unittest import mock  # replace the network, database and input calls with 
 from ddi_backend import composer, llm, llm_chat  # the three modules under test
 from ddi_backend.checker import Checker  # deterministic checker that produces the pair results to explain
 # the explain-mode classes and functions under test
-from ddi_backend.llm import Explainer, OpenAIProvider, Provider, Settings, provider_from_env, validate_explanation
+from ddi_backend.llm import AnthropicProvider, Explainer, Provider, Settings, provider_from_env, validate_explanation
 from ddi_backend.retrieval import context_question  # builds a clarifying question about missing patient context
 from tests import support  # helper that opens the real database
 
@@ -68,25 +68,27 @@ class TestSettings(unittest.TestCase):  # tests for the two user settings
 class TestProvider(unittest.TestCase):  # tests for choosing and using the real provider
     def test_no_key_means_deterministic_only(self):  # no key, no provider
         self.assertIsNone(provider_from_env({}))  # no key at all gives None
-        self.assertIsNone(provider_from_env({"OPENAI_API_KEY": ""}))  # an empty key also gives None
+        self.assertIsNone(provider_from_env({"ANTHROPIC_API_KEY": ""}))  # an empty key also gives None
 
     def test_key_and_model_come_from_the_environment(self):  # settings are read from environment variables
-        provider = provider_from_env({"OPENAI_API_KEY": "k", "OPENAI_MODEL": "m"})  # both set
+        provider = provider_from_env({"ANTHROPIC_API_KEY": "k", "ANTHROPIC_MODEL": "m"})  # both set
         self.assertEqual((provider.api_key, provider.model), ("k", "m"))  # both were used
-        self.assertEqual(provider_from_env({"OPENAI_API_KEY": "k"}).model, "gpt-4o-mini")  # default model when unset
+        self.assertEqual(provider_from_env({"ANTHROPIC_API_KEY": "k"}).model, "claude-sonnet-4-5")  # default model
 
     def test_no_key_is_stored_in_code(self):  # no secret key is written in the source
         source = Path(llm.__file__).read_text(encoding="utf-8") + Path(llm_chat.__file__).read_text(encoding="utf-8")  # both files
         self.assertNotIn("sk-", source)  # no key-looking prefix appears
 
-    def test_openai_provider_uses_urllib_and_sends_no_tools(self):  # the request carries no tools
-        response = io.BytesIO(json.dumps({"choices": [{"message": {"content": "{}"}}]}).encode())  # fake HTTP response
+    def test_anthropic_provider_uses_urllib_and_sends_no_tools(self):  # the request carries no tools
+        response = io.BytesIO(json.dumps({"content": [{"type": "text", "text": "{}"}]}).encode())  # fake response
         with mock.patch("ddi_backend.llm_chat.urlopen", return_value=response) as urlopen:  # fake the network call
-            reply = OpenAIProvider("test-key", "test-model").complete([{"role": "user", "content": "x"}])  # one call
+            reply = AnthropicProvider("test-key", "test-model").complete([
+                {"role": "system", "content": "rules"}, {"role": "user", "content": "x"}])  # one call
         self.assertEqual(reply, "{}")  # the reply text was extracted
         payload = json.loads(urlopen.call_args.args[0].data)  # the JSON body that was sent
-        self.assertEqual(set(payload), {"model", "messages", "response_format"})  # no tools, no browsing
+        self.assertEqual(set(payload), {"model", "max_tokens", "system", "messages"})  # Anthropic request, no tools
         self.assertEqual(payload["model"], "test-model")  # the model name was sent
+        self.assertEqual(payload["system"], "rules")  # system instructions use a separate field
 
 
 class TestTemplateComposer(LlmTestCase):  # tests for the no-model text builder
@@ -277,7 +279,7 @@ class TestSelectorModeStillWorks(unittest.TestCase):  # confirms the older selec
                     llm_chat.select_records(reply, [self.RECORD])
 
     def test_no_candidates_means_no_api_call(self):  # no candidates, no model call
-        with mock.patch.dict(os.environ, {"OPENAI_API_KEY": "k"}), \
+        with mock.patch.dict(os.environ, {"ANTHROPIC_API_KEY": "k"}), \
                 mock.patch("ddi_backend.llm_chat.open_database", return_value=mock.Mock()), \
                 mock.patch("ddi_backend.llm_chat.search_records", return_value=[]), \
                 mock.patch("ddi_backend.llm_chat.get_reply") as get_reply, \
